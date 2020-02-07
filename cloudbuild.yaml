@@ -1,0 +1,4 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '-t', 'gcr.io/montycarter-cr-gke-dev/http_server:latest', '.' ]
+images: ['gcr.io/montycarter-cr-gke-dev/http_server:latest']
