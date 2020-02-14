@@ -54,6 +54,6 @@ func main() {
 	// The Handler function provides a default handler to expose metrics
 	// via an HTTP server. "/metrics" is the usual endpoint for that.
 	http.Handle("/metrics", promhttp.Handler())
-	http.Handle("/", promhttp.InstrumentHandlerDuration(duration.MustCurryWith(prometheus.Labels{"handler": "/"}), rootHandler()))
+	http.Handle("/me", promhttp.InstrumentHandlerDuration(duration.MustCurryWith(prometheus.Labels{"handler": "/me"}), rootHandler()))
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
