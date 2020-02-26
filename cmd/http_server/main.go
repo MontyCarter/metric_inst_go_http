@@ -1,59 +1,66 @@
+// metrics_quickstart is an example of exporting a custom metric from
+// OpenCensus to Stackdriver.
 package main
 
 import (
+	"context"
 	"fmt"
-	"html"
 	"log"
-	"net/http"
+	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"contrib.go.opencensus.io/exporter/stackdriver"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/stats/view"
+	"golang.org/x/exp/rand"
 )
 
 var (
-	cpuTemp = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "cpu_temperature_celsius",
-		Help: "Current temperature of the CPU.",
-	})
-	hdFailures = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "hd_errors_total",
-			Help: "Number of hard-disk errors.",
-		},
-		[]string{"device"},
-	)
-	// duration is partitioned by the HTTP method and handler. It uses custom
-	// buckets based on the expected request duration.
-	duration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "request_duration_seconds",
-			Help:    "A histogram of latencies for requests.",
-			Buckets: []float64{.25, .5, 1, 2.5, 5, 10},
-		},
-		[]string{"handler", "method"},
-	)
+	// The task latency in milliseconds.
+	latencyMs = stats.Float64("task_latency", "The task latency in milliseconds", "ms")
 )
 
-func init() {
-	// Metrics have to be registered to be exposed:
-	prometheus.MustRegister(cpuTemp)
-	prometheus.MustRegister(hdFailures)
-	prometheus.MustRegister(duration)
-}
-
-func rootHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
-	})
-}
-
 func main() {
-	cpuTemp.Set(65.3)
-	hdFailures.With(prometheus.Labels{"device": "/dev/sda"}).Inc()
+	ctx := context.Background()
 
-	// The Handler function provides a default handler to expose metrics
-	// via an HTTP server. "/metrics" is the usual endpoint for that.
-	http.Handle("/metrics", promhttp.Handler())
-	http.Handle("/me", promhttp.InstrumentHandlerDuration(duration.MustCurryWith(prometheus.Labels{"handler": "/me"}), rootHandler()))
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	// Register the view. It is imperative that this step exists,
+	// otherwise recorded metrics will be dropped and never exported.
+	v := &view.View{
+		Name:        "task_latency_distribution",
+		Measure:     latencyMs,
+		Description: "The distribution of the task latencies",
+
+		// Latency in buckets:
+		// [>=0ms, >=100ms, >=200ms, >=400ms, >=1s, >=2s, >=4s]
+		Aggregation: view.Distribution(0, 100, 200, 400, 1000, 2000, 4000),
+	}
+	if err := view.Register(v); err != nil {
+		log.Fatalf("Failed to register the view: %v", err)
+	}
+
+	// Enable OpenCensus exporters to export metrics
+	// to Stackdriver Monitoring.
+	// Exporters use Application Default Credentials to authenticate.
+	// See https://developers.google.com/identity/protocols/application-default-credentials
+	// for more details.
+	exporter, err := stackdriver.NewExporter(stackdriver.Options{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Flush must be called before main() exits to ensure metrics are recorded.
+	defer exporter.Flush()
+
+	if err := exporter.StartMetricsExporter(); err != nil {
+		log.Fatalf("Error starting metric exporter: %v", err)
+	}
+	defer exporter.StopMetricsExporter()
+
+	// Record 100 fake latency values between 0 and 5 seconds.
+	for i := 0; i < 100; i++ {
+		ms := float64(5*time.Second/time.Millisecond) * rand.Float64()
+		fmt.Printf("Latency %d: %f\n", i, ms)
+		stats.Record(ctx, latencyMs.M(ms))
+		time.Sleep(1 * time.Second)
+	}
+
+	fmt.Println("Done recording metrics")
 }
