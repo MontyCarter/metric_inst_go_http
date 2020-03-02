@@ -42,7 +42,10 @@ func main() {
 	// Exporters use Application Default Credentials to authenticate.
 	// See https://developers.google.com/identity/protocols/application-default-credentials
 	// for more details.
-	exporter, err := stackdriver.NewExporter(stackdriver.Options{})
+	exporter, err := stackdriver.NewExporter(stackdriver.Options{
+		ProjectID:    "montycarter-cr-gke-dev",
+		MetricPrefix: "MyPrefix",
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
