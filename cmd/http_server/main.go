@@ -43,8 +43,9 @@ func main() {
 	// See https://developers.google.com/identity/protocols/application-default-credentials
 	// for more details.
 	exporter, err := stackdriver.NewExporter(stackdriver.Options{
-		ProjectID:    "montycarter-cr-gke-dev",
-		MetricPrefix: "MyPrefix",
+		ProjectID:       "montycarter-cr-gke-dev",
+		MetricPrefix:    "MyPrefix",
+		GetMetricPrefix: func(a string) string { return "SomeoneElsesPrefix" },
 	})
 	if err != nil {
 		log.Fatal(err)
