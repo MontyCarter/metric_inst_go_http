@@ -44,7 +44,7 @@ func main() {
 	// for more details.
 	exporter, err := stackdriver.NewExporter(stackdriver.Options{
 		ProjectID:       "montycarter-cr-gke-dev",
-		MetricPrefix:    "MyPrefix",
+		GetMetricType:   func(view *view.View) string { return "custom.googleapis.com/" },
 		GetMetricPrefix: func(a string) string { return "SomeoneElsesPrefix" },
 	})
 	if err != nil {
