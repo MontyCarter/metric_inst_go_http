@@ -6,11 +6,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
+	"go.opencensus.io/zpages"
 	"golang.org/x/exp/rand"
 )
 
@@ -67,4 +69,13 @@ func main() {
 	}
 
 	fmt.Println("Done recording metrics")
+
+	mux := http.NewServeMux()
+	zpages.Handle(mux, "/debug")
+
+	// Change the address as needed
+	addr := ":8080"
+	if err := http.ListenAndServe(addr, mux); err != nil {
+		log.Fatalf("Failed to serve zPages")
+	}
 }
