@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
+	"contrib.go.opencensus.io/exporter/prometheus"
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
@@ -52,6 +54,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	promExporter, promErr := prometheus.NewExporter(prometheus.Options{
+		Namespace: "demo",
+	})
+	if promErr != nil {
+		log.Fatal(promErr)
+	}
+
 	// Flush must be called before main() exits to ensure metrics are recorded.
 	defer exporter.Flush()
 
@@ -72,9 +82,11 @@ func main() {
 
 	mux := http.NewServeMux()
 	zpages.Handle(mux, "/debug")
+	mux.Handle("/metrics", promExporter)
 
 	// Change the address as needed
-	addr := ":8080"
+	port := os.Getenv("PORT")
+	addr := ":" + port
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("Failed to serve zPages")
 	}
